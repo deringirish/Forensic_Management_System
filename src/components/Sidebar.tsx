@@ -31,7 +31,7 @@ export default function Sidebar({
         onClick={() => setActiveTab(id)}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all group cursor-pointer ${
           isActive
-            ? 'bg-indigo-650 text-white shadow-lg shadow-indigo-650/10'
+            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10'
             : 'hover:bg-slate-800/50 hover:text-slate-100 text-slate-400'
         }`}
       >
@@ -75,7 +75,7 @@ export default function Sidebar({
 
       {/* Navigation Grouping list */}
       <nav className="flex-1 px-3 space-y-2 overflow-y-auto pb-4 pt-2">
-        <span className="px-4 text-[9px] font-black text-slate-550 uppercase tracking-widest block mb-2">
+        <span className="px-4 text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-2">
           Core Operations
         </span>
         {renderNavButton('dashboard', 'Dashboard Hub', LayoutDashboard)}

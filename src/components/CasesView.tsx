@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, Calendar, AlertTriangle, ShieldCheck, MapPin, X } from 'lucide-react';
+import { Search, Plus, Calendar, AlertTriangle, ShieldCheck, MapPin, X, Trash } from 'lucide-react';
 import { Case, User as SystemUser, CrimeScene } from '../types';
 
 interface CasesViewProps {
@@ -9,6 +9,8 @@ interface CasesViewProps {
   onCreateCase: (caseData: any, sceneData: any) => void;
   onSelectCase: (caseId: number) => void;
   currentUser: SystemUser;
+  onDeleteCase?: (caseId: number) => void;
+  onDataChange?: () => void;
 }
 
 export default function CasesView({
@@ -17,7 +19,9 @@ export default function CasesView({
   crimeScenes,
   onCreateCase,
   onSelectCase,
-  currentUser
+  currentUser,
+  onDeleteCase,
+  onDataChange
 }: CasesViewProps) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -184,16 +188,31 @@ export default function CasesView({
               <div
                 key={c.case_id}
                 onClick={() => onSelectCase(c.case_id)}
-                className="bg-white border border-slate-200 hover:border-indigo-300 rounded-3xl p-5 shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col justify-between space-y-4 group"
+                className="bg-white border border-slate-200 hover:border-indigo-350 rounded-3xl p-5 shadow-sm hover:shadow-md cursor-pointer transition-all flex flex-col justify-between space-y-4 group"
               >
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
                     <span className="font-mono text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg font-bold uppercase tracking-wider">
                       {c.case_number}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold border ${getStatusColor(c.status)}`}>
-                      {c.status}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`px-2 py-0.5 rounded-lg text-[9px] font-bold border ${getStatusColor(c.status)}`}>
+                        {c.status}
+                      </span>
+                      {onDeleteCase && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('Are you sure you want to delete this case dossier? This action is permanent.')) {
+                              onDeleteCase(c.case_id);
+                            }
+                          }}
+                          className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all cursor-pointer"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div>
@@ -235,14 +254,14 @@ export default function CasesView({
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
             {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-55/30">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
               <div>
                 <h3 className="text-sm font-black text-slate-900">Authorize New Inquiry File</h3>
                 <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Enter dossier metadata and processing zone coordinates</p>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-650 cursor-pointer"
+                className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -252,7 +271,7 @@ export default function CasesView({
             <form onSubmit={handleCreateSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
               
               <div className="space-y-4">
-                <span className="text-[10px] font-bold text-indigo-650 uppercase tracking-widest block border-b border-slate-100 pb-1">I. Dossier Metadata</span>
+                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block border-b border-slate-100 pb-1">I. Dossier Metadata</span>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
@@ -311,7 +330,7 @@ export default function CasesView({
               </div>
 
               <div className="space-y-4">
-                <span className="text-[10px] font-bold text-indigo-650 uppercase tracking-widest block border-b border-slate-100 pb-1">II. Crime Scene Address</span>
+                <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest block border-b border-slate-100 pb-1">II. Crime Scene Address</span>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">

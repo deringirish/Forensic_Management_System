@@ -119,8 +119,8 @@ export default function DashboardView({
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {matchingCases.length > 0 && (
-                  <div className="bg-slate-55/40 border border-slate-100 rounded-2xl p-4 space-y-2">
-                    <span className="text-[10px] font-bold text-indigo-650 uppercase tracking-wider block">Cases ({matchingCases.length})</span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block">Cases ({matchingCases.length})</span>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {matchingCases.map(c => (
                         <div
@@ -143,8 +143,8 @@ export default function DashboardView({
                 )}
 
                 {matchingEvidence.length > 0 && (
-                  <div className="bg-slate-55/40 border border-slate-100 rounded-2xl p-4 space-y-2">
-                    <span className="text-[10px] font-bold text-blue-650 uppercase tracking-wider block">Evidence Items ({matchingEvidence.length})</span>
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+                    <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider block">Evidence Items ({matchingEvidence.length})</span>
                     <div className="space-y-2 max-h-48 overflow-y-auto">
                       {matchingEvidence.map(ev => (
                         <div

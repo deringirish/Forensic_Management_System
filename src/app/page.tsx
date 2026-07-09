@@ -15,6 +15,52 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [selectedCaseId, setSelectedCaseId] = useState<number | null>(null);
 
+  // Load initial tab/case from URL query params
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab') as ActiveTab;
+      const caseId = params.get('caseId');
+      
+      if (tab && ['dashboard', 'cases', 'evidence'].includes(tab)) {
+        setActiveTab(tab);
+      }
+      if (caseId) {
+        setSelectedCaseId(Number(caseId));
+      }
+    }
+  }, []);
+
+  // Sync state with back/forward history buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab') as ActiveTab;
+      const caseId = params.get('caseId');
+      
+      setActiveTab(tab || 'dashboard');
+      setSelectedCaseId(caseId ? Number(caseId) : null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const updateRoute = (tab: ActiveTab, caseId: number | null) => {
+    setActiveTab(tab);
+    setSelectedCaseId(caseId);
+    
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams();
+      params.set('tab', tab);
+      if (caseId !== null) {
+        params.set('caseId', String(caseId));
+      }
+      const newUrl = `${window.location.pathname}?${params.toString()}`;
+      window.history.pushState({ tab, caseId }, '', newUrl);
+    }
+  };
+
   // Global State Repositories
   const [roles, setRoles] = useState<Role[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -145,13 +191,38 @@ export default function App() {
     fetchAllData();
   };
 
+  const handleDeleteCase = async (caseId: number) => {
+    try {
+      const res = await fetch(`/api/cases/${caseId}?operator_id=${currentUser?.user_id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteEvidence = async (evidenceId: number) => {
+    try {
+      const res = await fetch(`/api/evidence/${evidenceId}?operator_id=${currentUser?.user_id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchAllData();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleSelectCase = (caseId: number) => {
-    setSelectedCaseId(caseId);
+    updateRoute('cases', caseId);
   };
 
   const handleDashboardNavigate = (tabName: ActiveTab) => {
-    setSelectedCaseId(null);
-    setActiveTab(tabName);
+    updateRoute(tabName, null);
   };
 
   if (!currentUser) {
@@ -159,24 +230,25 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans">
+    <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans print:h-auto print:overflow-visible">
       
       {/* 1. Left Sidebar Rail */}
-      <Sidebar
-        activeTab={activeTab}
-        setActiveTab={(tab) => {
-          setSelectedCaseId(null);
-          setActiveTab(tab);
-        }}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        roles={roles}
-        departments={departments}
-      />
+      <div className="print:hidden">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            updateRoute(tab, null);
+          }}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          roles={roles}
+          departments={departments}
+        />
+      </div>
 
       {/* 2. Right Workspace Panel */}
-      <main className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+      <main className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-8 print:p-0 print:overflow-visible print:bg-white">
+        <div className="max-w-7xl mx-auto space-y-6 print:space-y-0">
           
           {/* Dashboard View */}
           {activeTab === 'dashboard' && (
@@ -205,7 +277,8 @@ export default function App() {
                 users={users}
                 crimeScenes={crimeScenes}
                 currentUser={currentUser}
-                onBack={() => setSelectedCaseId(null)}
+                onBack={() => updateRoute('cases', null)}
+                onDataChange={fetchAllData}
               />
             ) : (
               <CasesView
@@ -215,6 +288,8 @@ export default function App() {
                 onCreateCase={handleCreateCase}
                 onSelectCase={handleSelectCase}
                 currentUser={currentUser}
+                onDeleteCase={handleDeleteCase}
+                onDataChange={fetchAllData}
               />
             )
           )}
@@ -229,6 +304,8 @@ export default function App() {
               onAddEvidence={handleAddEvidence}
               onUpdateEvidence={handleUpdateEvidence}
               currentUser={currentUser}
+              onDeleteEvidence={handleDeleteEvidence}
+              onDataChange={fetchAllData}
             />
           )}
 

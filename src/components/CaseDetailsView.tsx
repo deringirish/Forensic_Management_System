@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, FileText, UploadCloud, MapPin, Printer, Download, Eye, Plus, Trash, UserPlus, X } from 'lucide-react';
-import { Case, User, CrimeScene, CaseAssignment, Person, Suspect, Victim, Witness, Evidence, Document, CaseTimeline } from '../types';
+import { ArrowLeft, FileText, UploadCloud, MapPin, Printer, Download, Eye, Plus, Trash, UserPlus, X, Edit } from 'lucide-react';
+import { Case, User, CrimeScene, CaseAssignment, Person, Suspect, Victim, Witness, Evidence, Document, CaseTimeline, EvidenceType } from '../types';
 
 interface CaseDetailsViewProps {
   selectedCaseId: number;
@@ -8,6 +8,7 @@ interface CaseDetailsViewProps {
   crimeScenes: CrimeScene[];
   currentUser: User;
   onBack: () => void;
+  onDataChange?: () => void;
 }
 
 export default function CaseDetailsView({
@@ -15,7 +16,8 @@ export default function CaseDetailsView({
   users,
   crimeScenes,
   currentUser,
-  onBack
+  onBack,
+  onDataChange
 }: CaseDetailsViewProps) {
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'evidence' | 'people' | 'briefing'>('overview');
   const [caseItem, setCaseItem] = useState<Case | null>(null);
@@ -23,6 +25,7 @@ export default function CaseDetailsView({
   const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [timeline, setTimeline] = useState<CaseTimeline[]>([]);
+  const [evidenceTypes, setEvidenceTypes] = useState<EvidenceType[]>([]);
   const [scene, setScene] = useState<CrimeScene | null>(null);
 
   // Associated persons states
@@ -53,6 +56,78 @@ export default function CaseDetailsView({
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
+  // Evidence Creation & Linkage states
+  const [showEvidenceModal, setShowEvidenceModal] = useState(false);
+  const [addEvidenceDesc, setAddEvidenceDesc] = useState('');
+  const [addEvidenceTypeId, setAddEvidenceTypeId] = useState('1');
+  const [addEvidenceLocation, setAddEvidenceLocation] = useState('Main Vault, Safe Locker 1');
+  const [addEvidenceSealed, setAddEvidenceSealed] = useState(true);
+  const [selectedEvidenceIdForUpload, setSelectedEvidenceIdForUpload] = useState<string>('');
+
+  // Edit Evidence states
+  const [editingEvidence, setEditingEvidence] = useState<Evidence | null>(null);
+  const [editEvidenceDesc, setEditEvidenceDesc] = useState('');
+  const [editEvidenceLocation, setEditEvidenceLocation] = useState('');
+  const [editEvidenceStatus, setEditEvidenceStatus] = useState('');
+  const [editEvidenceSealed, setEditEvidenceSealed] = useState(true);
+
+  // Edit Case states
+  const [showEditCaseModal, setShowEditCaseModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editCrimeType, setEditCrimeType] = useState('');
+  const [editPriority, setEditPriority] = useState<'Low' | 'Medium' | 'High' | 'Critical'>('Medium');
+  const [editLeadInvestigator, setEditLeadInvestigator] = useState('');
+
+  // Edit Person states
+  const [editingPerson, setEditingPerson] = useState<{ type: 'suspect' | 'victim' | 'witness', data: any } | null>(null);
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
+  const [editGender, setEditGender] = useState('Male');
+  const [editDob, setEditDob] = useState('1990-01-01');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+
+  const [editSuspectRisk, setEditSuspectRisk] = useState<'Low' | 'Medium' | 'High'>('Medium');
+  const [editSuspectRecord, setEditSuspectRecord] = useState('');
+  const [editSuspectStatus, setEditSuspectStatus] = useState<Suspect['status']>('Under Watch');
+  const [editVictimInjuries, setEditVictimInjuries] = useState('');
+  const [editWitnessStatement, setEditWitnessStatement] = useState('');
+
+  useEffect(() => {
+    if (caseItem) {
+      setEditTitle(caseItem.title);
+      setEditDesc(caseItem.description || '');
+      setEditCrimeType(caseItem.crime_type);
+      setEditPriority(caseItem.priority as any);
+      setEditLeadInvestigator(String(caseItem.lead_investigator));
+    }
+  }, [caseItem]);
+
+  useEffect(() => {
+    if (editingPerson) {
+      const p = editingPerson.data.person;
+      setEditFirstName(p.first_name);
+      setEditLastName(p.last_name);
+      setEditGender(p.gender || 'Male');
+      setEditDob(p.dob || '1990-01-01');
+      setEditPhone(p.phone || '');
+      setEditEmail(p.email || '');
+      setEditAddress(p.address || '');
+
+      if (editingPerson.type === 'suspect') {
+        setEditSuspectRisk(editingPerson.data.risk_level);
+        setEditSuspectRecord(editingPerson.data.criminal_record || '');
+        setEditSuspectStatus(editingPerson.data.status);
+      } else if (editingPerson.type === 'witness') {
+        setEditWitnessStatement(editingPerson.data.statement);
+      } else if (editingPerson.type === 'victim') {
+        setEditVictimInjuries(editingPerson.data.injury_details || '');
+      }
+    }
+  }, [editingPerson]);
+
   const loadData = async () => {
     try {
       const resCase = await fetch(`/api/cases/${selectedCaseId}`);
@@ -79,6 +154,11 @@ export default function CaseDetailsView({
 
       const resTime = await fetch(`/api/timeline?case_id=${selectedCaseId}`);
       setTimeline(await resTime.json());
+
+      const resEvTypes = await fetch('/api/evidence-types');
+      if (resEvTypes.ok) {
+        setEvidenceTypes(await resEvTypes.json());
+      }
 
       const resPersons = await fetch('/api/persons');
       const persons: Person[] = await resPersons.json();
@@ -134,6 +214,7 @@ export default function CaseDetailsView({
       });
       if (response.ok) {
         loadData();
+        if (onDataChange) onDataChange();
       }
     } catch (err) {
       console.error(err);
@@ -157,6 +238,7 @@ export default function CaseDetailsView({
         setAssignUserId('');
         setAssignRole('Investigator');
         loadData();
+        if (onDataChange) onDataChange();
       }
     } catch (err) {
       console.error(err);
@@ -170,9 +252,74 @@ export default function CaseDetailsView({
       });
       if (response.ok) {
         loadData();
+        if (onDataChange) onDataChange();
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleDeleteDoc = async (docId: number) => {
+    if (confirm('Are you sure you want to permanently delete this document?')) {
+      try {
+        const response = await fetch(`/api/documents/${docId}?operator_id=${currentUser.user_id}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          loadData();
+          if (onDataChange) onDataChange();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleDeleteSuspect = async (suspectId: number) => {
+    if (confirm('Are you sure you want to remove this suspect dossier link?')) {
+      try {
+        const response = await fetch(`/api/suspects/${suspectId}?operator_id=${currentUser.user_id}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          loadData();
+          if (onDataChange) onDataChange();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleDeleteWitness = async (witnessId: number) => {
+    if (confirm('Are you sure you want to remove this witness record link?')) {
+      try {
+        const response = await fetch(`/api/witnesses/${witnessId}?operator_id=${currentUser.user_id}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          loadData();
+          if (onDataChange) onDataChange();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  const handleDeleteVictim = async (victimId: number) => {
+    if (confirm('Are you sure you want to remove this victim record link?')) {
+      try {
+        const response = await fetch(`/api/victims/${victimId}?operator_id=${currentUser.user_id}`, {
+          method: 'DELETE'
+        });
+        if (response.ok) {
+          loadData();
+          if (onDataChange) onDataChange();
+        }
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -192,6 +339,7 @@ export default function CaseDetailsView({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             case_id: selectedCaseId,
+            evidence_id: selectedEvidenceIdForUpload ? Number(selectedEvidenceIdForUpload) : null,
             file_name: file.name,
             file_type: file.type || 'application/octet-stream',
             file_data: base64Data,
@@ -203,7 +351,9 @@ export default function CaseDetailsView({
           throw new Error('Upload failed on server.');
         }
 
+        setSelectedEvidenceIdForUpload('');
         loadData();
+        if (onDataChange) onDataChange();
       } catch (err: any) {
         setUploadError(err.message || 'File upload failed');
       } finally {
@@ -281,6 +431,180 @@ export default function CaseDetailsView({
       setVictimInjuries('');
       setShowPersonModal(false);
       loadData();
+      if (onDataChange) onDataChange();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditPersonSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPerson) return;
+
+    try {
+      const personId = editingPerson.data.person_id;
+      const personRes = await fetch(`/api/persons/${personId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: editFirstName,
+          last_name: editLastName,
+          gender: editGender,
+          dob: editDob,
+          phone: editPhone,
+          email: editEmail,
+          address: editAddress
+        })
+      });
+
+      if (!personRes.ok) return;
+
+      if (editingPerson.type === 'suspect') {
+        const suspectId = editingPerson.data.suspect_id;
+        await fetch(`/api/suspects/${suspectId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            risk_level: editSuspectRisk,
+            criminal_record: editSuspectRecord,
+            status: editSuspectStatus,
+            operator_id: currentUser.user_id
+          })
+        });
+      } else if (editingPerson.type === 'witness') {
+        const witnessId = editingPerson.data.witness_id;
+        await fetch(`/api/witnesses/${witnessId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            statement: editWitnessStatement,
+            operator_id: currentUser.user_id
+          })
+        });
+      } else if (editingPerson.type === 'victim') {
+        const victimId = editingPerson.data.victim_id;
+        await fetch(`/api/victims/${victimId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            injury_details: editVictimInjuries,
+            operator_id: currentUser.user_id
+          })
+        });
+      }
+
+      setEditingPerson(null);
+      loadData();
+      if (onDataChange) onDataChange();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditCaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!caseItem) return;
+
+    try {
+      const response = await fetch(`/api/cases/${selectedCaseId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDesc,
+          crime_type: editCrimeType,
+          priority: editPriority,
+          lead_investigator: Number(editLeadInvestigator),
+          operator_id: currentUser.user_id
+        })
+      });
+
+      if (response.ok) {
+        setShowEditCaseModal(false);
+        loadData();
+        if (onDataChange) onDataChange();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddEvidenceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addEvidenceDesc) return;
+
+    try {
+      const response = await fetch('/api/evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_id: selectedCaseId,
+          type_id: Number(addEvidenceTypeId),
+          description: addEvidenceDesc,
+          storage_location: addEvidenceLocation,
+          is_sealed: addEvidenceSealed,
+          operator_id: currentUser.user_id
+        })
+      });
+      if (response.ok) {
+        setAddEvidenceDesc('');
+        setAddEvidenceLocation('Main Vault, Safe Locker 1');
+        setAddEvidenceTypeId('1');
+        setAddEvidenceSealed(true);
+        setShowEvidenceModal(false);
+        loadData();
+        if (onDataChange) onDataChange();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleDeleteEvidence = async (evidenceId: number) => {
+    if (!window.confirm("Are you sure you want to delete this evidence log?")) return;
+
+    try {
+      const res = await fetch(`/api/evidence/${evidenceId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        loadData();
+        if (onDataChange) onDataChange();
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startEditEvidence = (ev: Evidence) => {
+    setEditingEvidence(ev);
+    setEditEvidenceDesc(ev.description);
+    setEditEvidenceLocation(ev.storage_location);
+    setEditEvidenceStatus(ev.current_status);
+    setEditEvidenceSealed(ev.is_sealed);
+  };
+
+  const handleEditEvidenceSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEvidence) return;
+
+    try {
+      const response = await fetch(`/api/evidence/${editingEvidence.evidence_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: editEvidenceDesc,
+          storage_location: editEvidenceLocation,
+          current_status: editEvidenceStatus,
+          is_sealed: editEvidenceSealed,
+          operator_id: currentUser.user_id
+        })
+      });
+      if (response.ok) {
+        setEditingEvidence(null);
+        loadData();
+        if (onDataChange) onDataChange();
+      }
     } catch (err) {
       console.error(err);
     }
@@ -309,13 +633,14 @@ export default function CaseDetailsView({
 
   return (
     <div className="space-y-6 font-sans">
+      <div className="space-y-6 print:hidden">
       
       {/* Title block */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="p-2.5 border border-slate-200 hover:bg-slate-100 rounded-2xl transition-all text-slate-650 cursor-pointer"
+            className="p-2.5 border border-slate-200 hover:bg-slate-100 rounded-2xl transition-all text-slate-700 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
@@ -331,6 +656,13 @@ export default function CaseDetailsView({
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
+          <button
+            onClick={() => setShowEditCaseModal(true)}
+            className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+          >
+            <Edit className="w-3.5 h-3.5" />
+            <span>Edit Dossier</span>
+          </button>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status:</span>
           <select
             value={statusVal}
@@ -352,7 +684,7 @@ export default function CaseDetailsView({
             key={tab}
             onClick={() => setActiveSubTab(tab)}
             className={`pb-3 font-bold text-xs border-b-2 px-1 transition-all uppercase tracking-widest cursor-pointer ${
-              activeSubTab === tab ? 'border-indigo-600 text-indigo-650' : 'border-transparent text-slate-400 hover:text-slate-700'
+              activeSubTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-700'
             }`}
           >
             {tab}
@@ -379,7 +711,7 @@ export default function CaseDetailsView({
                   <div>
                     <span className="font-bold text-slate-800 text-xs block">Crime Scene Location</span>
                     <span className="text-[11px] text-slate-500 block mt-0.5">{scene.address}, {scene.district}, {scene.city}</span>
-                    <p className="text-xs text-slate-650 italic mt-2">{scene.description}</p>
+                    <p className="text-xs text-slate-600 italic mt-2">{scene.description}</p>
                   </div>
                 </div>
               )}
@@ -400,8 +732,8 @@ export default function CaseDetailsView({
 
                   return (
                     <div key={event.timeline_id} className="relative pl-8 flex gap-3 text-xs leading-relaxed">
-                      <div className="absolute left-[10px] top-1 w-4 h-4 bg-white border-2 border-indigo-650 rounded-full flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 bg-indigo-650 rounded-full"></div>
+                      <div className="absolute left-[10px] top-1 w-4 h-4 bg-white border-2 border-indigo-600 rounded-full flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></div>
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -491,101 +823,72 @@ export default function CaseDetailsView({
         </div>
       )}
 
-      {/* SUB-TAB: Evidence & Documents */}
+      {/* SUB-TAB: Evidence Inventory */}
       {activeSubTab === 'evidence' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm space-y-4">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">Evidence Inventory</h3>
-                <p className="text-slate-400 text-[9px] font-medium uppercase mt-0.5">Physical assets linked to this file</p>
-              </div>
+        <div className="bg-white border border-slate-200 p-6 rounded-3xl shadow-sm space-y-5">
+          <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Evidence Logbook</h3>
+              <p className="text-slate-400 text-[9px] font-medium uppercase mt-0.5">Physical assets linked to this case file</p>
+            </div>
+            <button
+              onClick={() => setShowEvidenceModal(true)}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 active:scale-[0.98] shadow-md"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Evidence Log</span>
+            </button>
+          </div>
 
-              {evidence.length === 0 ? (
-                <div className="p-8 border border-dashed border-slate-200 rounded-2xl text-center text-slate-400 text-xs font-semibold">
-                  No evidence assets logged for this case.
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {evidence.map((ev) => (
-                    <div key={ev.evidence_id} className="p-4 border border-slate-100 rounded-2xl space-y-3 bg-slate-50/40">
-                      <div className="flex justify-between items-center">
-                        <span className="font-mono text-[9px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg uppercase tracking-wider">
-                          {ev.barcode}
-                        </span>
+          {evidence.length === 0 ? (
+            <div className="p-12 border border-dashed border-slate-200 rounded-3xl text-center text-slate-400 text-xs font-semibold">
+              No evidence assets logged for this case.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {evidence.map((ev) => (
+                <div key={ev.evidence_id} className="p-5 border border-slate-100 rounded-2xl space-y-3.5 bg-slate-50/40 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="font-mono text-[9px] text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded-lg uppercase tracking-wider">
+                        {ev.barcode}
+                      </span>
+                      <div className="flex items-center gap-1.5">
                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-extrabold ${
                           ev.is_sealed ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'
                         }`}>
                           {ev.is_sealed ? 'SEALED' : 'UNSEALED'}
                         </span>
-                      </div>
-                      <p className="text-xs text-slate-700 font-semibold">{ev.description}</p>
-                      <div className="text-[10px] text-slate-400 font-medium pt-2 border-t border-slate-100 space-y-1">
-                        <div className="flex justify-between"><span>LOCATION:</span><span className="font-bold text-slate-650">{ev.storage_location}</span></div>
-                        <div className="flex justify-between"><span>CUSTODY:</span><span className="font-bold text-slate-650 uppercase">{ev.current_status}</span></div>
+                        <button
+                          onClick={() => startEditEvidence(ev)}
+                          className="p-1 hover:bg-slate-150 rounded transition-all cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5 text-slate-400 hover:text-indigo-600" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvidence(ev.evidence_id)}
+                          className="p-1 hover:bg-red-50 rounded transition-all cursor-pointer"
+                        >
+                          <Trash className="w-3.5 h-3.5 text-slate-400 hover:text-red-500" />
+                        </button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Secure Document Vault */}
-          <div className="space-y-6">
-            <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm space-y-4">
-              <div>
-                <h3 className="font-bold text-slate-900 text-sm">Secure Document Vault</h3>
-                <p className="text-slate-400 text-[9px] font-medium uppercase mt-0.5">Certificates & examination files</p>
-              </div>
-
-              {/* Upload Box */}
-              <div className="relative border-2 border-dashed border-slate-200 hover:border-indigo-500/50 bg-slate-50 rounded-2xl p-6 text-center cursor-pointer transition-all">
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  disabled={uploadLoading}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                />
-                <div className="flex flex-col items-center justify-center space-y-1.5">
-                  <UploadCloud className="w-8 h-8 text-slate-400" />
-                  <span className="text-xs font-bold text-slate-700 block">
-                    {uploadLoading ? 'Uploading...' : 'Click to Upload Document'}
-                  </span>
-                  <span className="text-[9px] text-slate-400 block uppercase font-bold tracking-wider">PDF, DOCX, JPEG</span>
-                </div>
-              </div>
-
-              {uploadError && (
-                <div className="p-3 bg-red-50 border border-red-100 text-red-650 text-xs rounded-xl">
-                  {uploadError}
-                </div>
-              )}
-
-              {/* Document list */}
-              <div className="divide-y divide-slate-100 pt-2">
-                {documents.map((doc) => (
-                  <div key={doc.document_id} className="py-2.5 flex items-center justify-between text-xs hover:bg-slate-50 px-1 rounded-xl transition-all">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <FileText className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={doc.file_name}>
-                        {doc.file_name}
-                      </span>
-                    </div>
-                    <a
-                      href={doc.file_path}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      download={doc.file_name}
-                      className="text-[9px] bg-slate-100 hover:bg-indigo-600 hover:text-white px-2 py-1 rounded-lg transition-all font-bold shrink-0 uppercase tracking-wide"
-                    >
-                      Decrypt
-                    </a>
+                    <p className="text-xs text-slate-700 font-bold">{ev.description}</p>
                   </div>
-                ))}
-              </div>
+                  <div className="text-[10px] text-slate-400 font-medium pt-3.5 border-t border-slate-100 space-y-1">
+                    <div className="flex justify-between">
+                      <span>LOCATION:</span>
+                      <span className="font-bold text-slate-700">{ev.storage_location}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>CUSTODY:</span>
+                      <span className="font-bold text-slate-700 uppercase">{ev.current_status}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -619,7 +922,7 @@ export default function CaseDetailsView({
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Suspects */}
             <div className="space-y-4">
-              <span className="font-black text-red-900 text-xs uppercase tracking-widest block border-b border-red-100 pb-1">Suspect Profiles</span>
+              <span className="font-black text-red-950 text-xs uppercase tracking-widest block border-b border-red-100 pb-1">Suspect Profiles</span>
               <div className="space-y-3">
                 {suspects.map((s) => (
                   <div key={s.suspect_id} className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-3">
@@ -628,15 +931,29 @@ export default function CaseDetailsView({
                         <span className="font-bold text-slate-900 text-xs block">{s.person.first_name} {s.person.last_name}</span>
                         <span className="text-[9px] text-slate-400 block font-semibold mt-0.5">{s.person.dob} | {s.person.gender}</span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold ${s.risk_level === 'High' ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
-                        {s.risk_level} Risk
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`px-2 py-0.5 rounded text-[8px] font-extrabold ${s.risk_level === 'High' ? 'bg-red-50 text-red-700' : 'bg-orange-50 text-orange-700'}`}>
+                          {s.risk_level} Risk
+                        </span>
+                        <button
+                          onClick={() => setEditingPerson({ type: 'suspect', data: s })}
+                          className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition-all cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSuspect(s.suspect_id)}
+                          className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all cursor-pointer"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <div className="text-xs space-y-2 pt-2 border-t border-slate-100">
                       <p className="text-slate-500 italic text-[11px] leading-relaxed">{s.criminal_record || 'No record file.'}</p>
                       <div className="flex justify-between items-center text-[9px] font-bold">
                         <span className="text-slate-400">STATUS:</span>
-                        <span className="uppercase text-red-650">{s.status}</span>
+                        <span className="uppercase text-red-600">{s.status}</span>
                       </div>
                     </div>
                   </div>
@@ -646,13 +963,29 @@ export default function CaseDetailsView({
 
             {/* Witnesses */}
             <div className="space-y-4">
-              <span className="font-black text-blue-900 text-xs uppercase tracking-widest block border-b border-blue-100 pb-1">Witness Statements</span>
+              <span className="font-black text-blue-950 text-xs uppercase tracking-widest block border-b border-blue-100 pb-1">Witness Statements</span>
               <div className="space-y-3">
                 {witnesses.map((w) => (
                   <div key={w.witness_id} className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-3">
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs block">{w.person.first_name} {w.person.last_name}</span>
-                      <span className="text-[9px] text-slate-400 block font-semibold mt-0.5">{w.person.phone}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs block">{w.person.first_name} {w.person.last_name}</span>
+                        <span className="text-[9px] text-slate-400 block font-semibold mt-0.5">{w.person.phone}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => setEditingPerson({ type: 'witness', data: w })}
+                          className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition-all cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteWitness(w.witness_id)}
+                          className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all cursor-pointer"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <p className="italic text-slate-600 text-[11px] leading-relaxed bg-slate-50 p-2.5 rounded-xl border border-slate-100">
                       "{w.statement}"
@@ -668,9 +1001,25 @@ export default function CaseDetailsView({
               <div className="space-y-3">
                 {victims.map((v) => (
                   <div key={v.victim_id} className="bg-white border border-slate-200 rounded-3xl p-4 shadow-sm space-y-3">
-                    <div>
-                      <span className="font-bold text-slate-900 text-xs block">{v.person.first_name} {v.person.last_name}</span>
-                      <span className="text-[9px] text-slate-400 block font-semibold mt-0.5">{v.person.dob}</span>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="font-bold text-slate-900 text-xs block">{v.person.first_name} {v.person.last_name}</span>
+                        <span className="text-[9px] text-slate-400 block font-semibold mt-0.5">{v.person.dob}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => setEditingPerson({ type: 'victim', data: v })}
+                          className="p-1 hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded transition-all cursor-pointer"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVictim(v.victim_id)}
+                          className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all cursor-pointer"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-slate-500 italic text-[11px] leading-relaxed">{v.injury_details || 'Minor physical injuries logged.'}</p>
                   </div>
@@ -704,7 +1053,7 @@ export default function CaseDetailsView({
             </div>
             <div className="flex justify-between items-center pb-1 font-semibold text-slate-700">
               <span>INQUIRY STATUS:</span>
-              <span className="uppercase font-bold text-indigo-650">{caseItem.status}</span>
+              <span className="uppercase font-bold text-indigo-600">{caseItem.status}</span>
             </div>
           </div>
 
@@ -732,12 +1081,12 @@ export default function CaseDetailsView({
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-55/30">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
               <div>
                 <h3 className="text-sm font-black text-slate-900 capitalize">Add Associated {showPersonModal}</h3>
                 <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Link person profile to case</p>
               </div>
-              <button onClick={() => setShowPersonModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-650 cursor-pointer">
+              <button onClick={() => setShowPersonModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -814,14 +1163,14 @@ export default function CaseDetailsView({
 
               {showPersonModal === 'suspect' && (
                 <div className="pt-3 border-t border-slate-100 space-y-3">
-                  <span className="text-[10px] font-bold text-red-650 uppercase tracking-widest block">Suspect Configuration</span>
+                  <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest block">Suspect Configuration</span>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Risk</label>
                       <select
                         value={suspectRisk}
                         onChange={(e) => setSuspectRisk(e.target.value as any)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-755 text-xs font-semibold focus:outline-none"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none"
                       >
                         <option value="Low">Low Risk</option>
                         <option value="Medium">Medium Threat</option>
@@ -833,7 +1182,7 @@ export default function CaseDetailsView({
                       <select
                         value={suspectStatus}
                         onChange={(e) => setSuspectStatus(e.target.value as any)}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-755 text-xs font-semibold focus:outline-none"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none"
                       >
                         <option value="Under Watch">Under Watch</option>
                         <option value="Detained">Detained</option>
@@ -857,7 +1206,7 @@ export default function CaseDetailsView({
 
               {showPersonModal === 'witness' && (
                 <div className="pt-3 border-t border-slate-100 space-y-2">
-                  <span className="text-[10px] font-bold text-blue-650 uppercase tracking-widest block">Witness Configuration</span>
+                  <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block">Witness Configuration</span>
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Testimony Statement *</label>
                     <textarea
@@ -899,7 +1248,7 @@ export default function CaseDetailsView({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-650 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer active:scale-[0.98]"
                 >
                   Register Link
                 </button>
@@ -908,6 +1257,637 @@ export default function CaseDetailsView({
           </div>
         </div>
       )}
+
+      {/* Edit Case Modal */}
+      {showEditCaseModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Edit Case Dossier</h3>
+                <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Modify inquiry file details</p>
+              </div>
+              <button onClick={() => setShowEditCaseModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditCaseSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 ml-1">Inquiry Title *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-xs font-semibold focus:outline-none focus:bg-white focus:border-indigo-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 ml-1">Crime Category *</label>
+                  <select
+                    value={editCrimeType}
+                    onChange={(e) => setEditCrimeType(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                  >
+                    <option value="Homicide">Homicide</option>
+                    <option value="Cyber Crime">Cyber Crime</option>
+                    <option value="Grand Larceny">Grand Larceny</option>
+                    <option value="Narcotics">Narcotics</option>
+                    <option value="Fraud">Fraud</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 ml-1">Threat Priority *</label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value as any)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                  >
+                    <option value="Low">Low Priority</option>
+                    <option value="Medium">Medium Threat</option>
+                    <option value="High">High Infiltration</option>
+                    <option value="Critical">Critical Impact</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 ml-1">Lead Investigator *</label>
+                  <select
+                    value={editLeadInvestigator}
+                    onChange={(e) => setEditLeadInvestigator(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                  >
+                    {users.map(u => (
+                      <option key={u.user_id} value={u.user_id}>{u.first_name} {u.last_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5 ml-1">Case Description</label>
+                  <textarea
+                    rows={3}
+                    value={editDesc}
+                    onChange={(e) => setEditDesc(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-800 text-xs font-semibold focus:outline-none focus:bg-white focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEditCaseModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs hover:bg-slate-50 font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Person Modal */}
+      {editingPerson && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900 capitalize">Edit Associated {editingPerson.type}</h3>
+                <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Modify person profile details</p>
+              </div>
+              <button onClick={() => setEditingPerson(null)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditPersonSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">First Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editFirstName}
+                    onChange={(e) => setEditFirstName(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Last Name *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editLastName}
+                    onChange={(e) => setEditLastName(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Gender</label>
+                  <select
+                    value={editGender}
+                    onChange={(e) => setEditGender(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                  >
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">DOB</label>
+                  <input
+                    type="date"
+                    value={editDob}
+                    onChange={(e) => setEditDob(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Phone Number</label>
+                  <input
+                    type="text"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Address</label>
+                  <input
+                    type="text"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {editingPerson.type === 'suspect' && (
+                <div className="pt-3 border-t border-slate-100 space-y-3">
+                  <span className="text-[10px] font-bold text-red-655 uppercase tracking-widest block">Suspect Configuration</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Risk</label>
+                      <select
+                        value={editSuspectRisk}
+                        onChange={(e) => setEditSuspectRisk(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none"
+                      >
+                        <option value="Low">Low Risk</option>
+                        <option value="Medium">Medium Threat</option>
+                        <option value="High">High Threat</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Status</label>
+                      <select
+                        value={editSuspectStatus}
+                        onChange={(e) => setEditSuspectStatus(e.target.value as any)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none"
+                      >
+                        <option value="Under Watch">Under Watch</option>
+                        <option value="Detained">Detained</option>
+                        <option value="Released">Released</option>
+                        <option value="Wanted">Wanted</option>
+                      </select>
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Prior Record Notes</label>
+                      <textarea
+                        rows={2}
+                        value={editSuspectRecord}
+                        onChange={(e) => setEditSuspectRecord(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {editingPerson.type === 'witness' && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <span className="text-[10px] font-bold text-blue-655 uppercase tracking-widest block">Witness Configuration</span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Testimony Statement *</label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={editWitnessStatement}
+                      onChange={(e) => setEditWitnessStatement(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editingPerson.type === 'victim' && (
+                <div className="pt-3 border-t border-slate-100 space-y-2">
+                  <span className="text-[10px] font-bold text-slate-800 uppercase tracking-widest block">Victim Configuration</span>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Injury / Trauma Log *</label>
+                    <textarea
+                      rows={3}
+                      required
+                      value={editVictimInjuries}
+                      onChange={(e) => setEditVictimInjuries(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingPerson(null)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold cursor-pointer hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Evidence Modal */}
+      {showEvidenceModal && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Add Evidence Log</h3>
+                <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Register new physical asset to case</p>
+              </div>
+              <button onClick={() => setShowEvidenceModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddEvidenceSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Asset Description *</label>
+                <textarea
+                  required
+                  rows={2}
+                  placeholder="E.g. Blood sample swab from kitchen door"
+                  value={addEvidenceDesc}
+                  onChange={(e) => setAddEvidenceDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Evidence Type *</label>
+                <select
+                  value={addEvidenceTypeId}
+                  onChange={(e) => setAddEvidenceTypeId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                >
+                  {evidenceTypes.map(t => (
+                    <option key={t.type_id} value={t.type_id}>{t.type_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Storage Location *</label>
+                <input
+                  type="text"
+                  required
+                  value={addEvidenceLocation}
+                  onChange={(e) => setAddEvidenceLocation(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 py-1">
+                <input
+                  type="checkbox"
+                  id="addEvidenceSealed"
+                  checked={addEvidenceSealed}
+                  onChange={(e) => setAddEvidenceSealed(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                />
+                <label htmlFor="addEvidenceSealed" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
+                  Sealed Locker Protection Active
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowEvidenceModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold cursor-pointer hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                >
+                  Log Evidence
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Evidence Modal */}
+      {editingEvidence && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+            
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">Edit Evidence Log</h3>
+                <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Modify details for {editingEvidence.barcode}</p>
+              </div>
+              <button onClick={() => setEditingEvidence(null)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditEvidenceSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Asset Description *</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={editEvidenceDesc}
+                  onChange={(e) => setEditEvidenceDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Storage Location *</label>
+                <input
+                  type="text"
+                  required
+                  value={editEvidenceLocation}
+                  onChange={(e) => setEditEvidenceLocation(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-xl text-slate-800 text-xs font-semibold focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Custody Status *</label>
+                <select
+                  value={editEvidenceStatus}
+                  onChange={(e) => setEditEvidenceStatus(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 text-xs font-semibold focus:outline-none focus:bg-white"
+                >
+                  <option value="Collected">Collected</option>
+                  <option value="In Transit">In Transit</option>
+                  <option value="Under Analysis">Under Analysis</option>
+                  <option value="In Storage">In Storage</option>
+                  <option value="Released">Released</option>
+                  <option value="Destroyed">Destroyed</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 py-1">
+                <input
+                  type="checkbox"
+                  id="editEvidenceSealed"
+                  checked={editEvidenceSealed}
+                  onChange={(e) => setEditEvidenceSealed(e.target.checked)}
+                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                />
+                <label htmlFor="editEvidenceSealed" className="text-xs font-bold text-slate-700 select-none cursor-pointer">
+                  Sealed Locker Protection Active
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingEvidence(null)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold cursor-pointer hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer active:scale-[0.98]"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      </div> {/* Close print:hidden */}
+
+      {/* Complete print dossier report */}
+      <div className="hidden print:block space-y-8 p-6 bg-white text-slate-900 min-h-screen">
+        {/* Official Seal / Header */}
+        <div className="border-b-2 border-slate-800 pb-4 flex justify-between items-end">
+          <div>
+            <span className="font-mono text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg uppercase">
+              DOSSIER: {caseItem.case_number}
+            </span>
+            <h1 className="text-2xl font-black mt-2">{caseItem.title}</h1>
+            <p className="text-slate-500 text-xs uppercase font-medium">{caseItem.crime_type} Case File</p>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">REPORT GENERATED</span>
+            <span className="text-xs font-mono font-bold">{new Date().toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Case Meta grid */}
+        <div className="grid grid-cols-3 gap-6 border-b border-slate-200 pb-6 text-xs">
+          <div>
+            <span className="text-slate-400 font-bold uppercase text-[9px] block mb-1">Status</span>
+            <span className="font-bold text-slate-800 uppercase">{caseItem.status}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase text-[9px] block mb-1">Priority</span>
+            <span className="font-bold text-slate-800 uppercase">{caseItem.priority}</span>
+          </div>
+          <div>
+            <span className="text-slate-400 font-bold uppercase text-[9px] block mb-1">Lead Investigator</span>
+            <span className="font-bold text-slate-800">
+              {users.find(u => u.user_id === caseItem.lead_investigator)
+                ? `${users.find(u => u.user_id === caseItem.lead_investigator)?.first_name} ${users.find(u => u.user_id === caseItem.lead_investigator)?.last_name}`
+                : 'None'}
+            </span>
+          </div>
+        </div>
+
+        {/* Crime Scene Location */}
+        {scene && (
+          <div className="space-y-2 border-b border-slate-200 pb-6 text-xs">
+            <h3 className="font-black text-slate-900 uppercase tracking-wider text-[10px]">Crime Scene Details</h3>
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-slate-400 font-bold uppercase text-[8px] block">Address</span>
+                <span className="font-semibold text-slate-800">{scene.address}, {scene.city}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 font-bold uppercase text-[8px] block">District / State</span>
+                <span className="font-semibold text-slate-800">{scene.district}, {scene.state}, {scene.country}</span>
+              </div>
+              <div className="col-span-2">
+                <span className="text-slate-400 font-bold uppercase text-[8px] block">Description</span>
+                <span className="text-slate-700">{scene.description}</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Evidence List */}
+        <div className="space-y-3 border-b border-slate-200 pb-6 text-xs">
+          <h3 className="font-black text-slate-900 uppercase tracking-wider text-[10px]">Registered Evidence Logs ({evidence.length})</h3>
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-300 text-slate-400 font-bold uppercase text-[8px]">
+                <th className="py-2">Barcode</th>
+                <th className="py-2">Type</th>
+                <th className="py-2">Description</th>
+                <th className="py-2">Status</th>
+                <th className="py-2">Location</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {evidence.map(ev => (
+                <tr key={ev.evidence_id}>
+                  <td className="py-2.5 font-mono font-bold text-slate-800">{ev.barcode}</td>
+                  <td className="py-2.5 font-semibold text-slate-800">
+                    {evidenceTypes.find(t => t.type_id === ev.type_id)?.type_name || 'Physical'}
+                  </td>
+                  <td className="py-2.5 text-slate-700">{ev.description}</td>
+                  <td className="py-2.5 uppercase font-bold text-[10px] text-slate-800">{ev.current_status}</td>
+                  <td className="py-2.5 text-slate-600">{ev.storage_location}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Personnel Grid */}
+        <div className="grid grid-cols-2 gap-8 border-b border-slate-200 pb-6 text-xs">
+          {/* Suspects */}
+          <div className="space-y-3">
+            <h3 className="font-black text-red-950 uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">Suspect Profiles</h3>
+            <div className="space-y-3">
+              {suspects.map(s => (
+                <div key={s.suspect_id} className="border border-slate-100 p-3 rounded-xl bg-slate-50/50">
+                  <span className="font-bold text-slate-900 block">{s.person.first_name} {s.person.last_name}</span>
+                  <span className="text-[9px] text-slate-400 block font-semibold">{s.person.dob} | {s.person.gender}</span>
+                  <p className="text-slate-600 text-[11px] italic mt-1.5">{s.criminal_record || 'No prior record.'}</p>
+                  <div className="flex gap-4 mt-1.5 text-[9px] font-bold">
+                    <span>RISK: {s.risk_level}</span>
+                    <span>STATUS: {s.status}</span>
+                  </div>
+                </div>
+              ))}
+              {suspects.length === 0 && <p className="text-slate-400 italic">No suspects linked.</p>}
+            </div>
+          </div>
+
+          {/* Witnesses */}
+          <div className="space-y-3">
+            <h3 className="font-black text-blue-950 uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">Witness Statements</h3>
+            <div className="space-y-3">
+              {witnesses.map(w => (
+                <div key={w.witness_id} className="border border-slate-100 p-3 rounded-xl bg-slate-50/50">
+                  <span className="font-bold text-slate-900 block">{w.person.first_name} {w.person.last_name}</span>
+                  <span className="text-[9px] text-slate-400 block font-semibold">{w.person.phone}</span>
+                  <p className="text-slate-600 text-[11px] italic mt-1.5 bg-white p-2 rounded border border-slate-100">"{w.statement}"</p>
+                </div>
+              ))}
+              {witnesses.length === 0 && <p className="text-slate-400 italic">No witness statements recorded.</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Victims & Documents */}
+        <div className="grid grid-cols-2 gap-8 border-b border-slate-200 pb-6 text-xs">
+          {/* Victims */}
+          <div className="space-y-3">
+            <h3 className="font-black text-slate-900 uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">Victims</h3>
+            <div className="space-y-3">
+              {victims.map(v => (
+                <div key={v.victim_id} className="border border-slate-100 p-3 rounded-xl bg-slate-50/50">
+                  <span className="font-bold text-slate-900 block">{v.person.first_name} {v.person.last_name}</span>
+                  <span className="text-[9px] text-slate-400 block font-semibold">{v.person.dob}</span>
+                  <p className="text-slate-500 italic mt-1.5 text-[11px]">{v.injury_details || 'Minor physical injuries logged.'}</p>
+                </div>
+              ))}
+              {victims.length === 0 && <p className="text-slate-400 italic">No victim profiles linked.</p>}
+            </div>
+          </div>
+
+          {/* Documents */}
+          <div className="space-y-3">
+            <h3 className="font-black text-slate-900 uppercase tracking-wider text-[10px] border-b border-slate-200 pb-1">Documents Uploaded</h3>
+            <div className="space-y-1.5">
+              {documents.map(doc => (
+                <div key={doc.document_id} className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="font-semibold text-slate-800">{doc.file_name}</span>
+                  <span className="text-slate-400 font-mono text-[9px]">{doc.file_type}</span>
+                </div>
+              ))}
+              {documents.length === 0 && <p className="text-slate-400 italic">No documents attached.</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div className="space-y-3 text-xs">
+          <h3 className="font-black text-slate-900 uppercase tracking-wider text-[10px]">Timeline of Events</h3>
+          <div className="space-y-2">
+            {timeline.map(event => {
+              const executor = users.find(u => u.user_id === event.performed_by);
+              const execName = executor ? `${executor.first_name} ${executor.last_name}` : 'Officer';
+              return (
+                <div key={event.timeline_id} className="flex justify-between border-b border-slate-100 pb-1.5">
+                  <div>
+                    <span className="font-bold text-slate-800">{event.action}</span>
+                    <p className="text-slate-600 text-[11px] mt-0.5">{event.description}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[9px] text-slate-400 font-mono block">{new Date(event.created_at).toLocaleDateString()}</span>
+                    <span className="text-[9px] text-slate-400 font-bold block">{execName}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
     </div>
   );

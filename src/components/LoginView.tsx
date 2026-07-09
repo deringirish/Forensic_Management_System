@@ -81,7 +81,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
               Officer Email
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-650">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
                 <Mail className="w-4 h-4" />
               </span>
               <input
@@ -100,7 +100,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
               Security Password
             </label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-650">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
                 <Lock className="w-4 h-4" />
               </span>
               <input
@@ -117,7 +117,7 @@ export default function LoginView({ onLoginSuccess }: LoginViewProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 bg-indigo-650 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-bold rounded-2xl text-xs transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-bold rounded-2xl text-xs transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer"
           >
             {loading ? (
               <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

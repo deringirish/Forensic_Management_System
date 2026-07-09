@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently --kill-others \"next dev\" \"cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000\"",
+    "dev:frontend": "next dev",
+    "dev:backend": "cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -33,6 +35,7 @@
     "@types/node": "^22.14.0",
     "@types/react": "19.2.17",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^10.0.3",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",

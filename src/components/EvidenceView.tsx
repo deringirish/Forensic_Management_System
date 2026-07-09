@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, FileText, ArrowRight, ShieldCheck, ShieldAlert, Calendar, MapPin, User, Package, X } from 'lucide-react';
+import { Search, Plus, FileText, ArrowRight, ShieldCheck, ShieldAlert, Calendar, MapPin, User, Package, X, Trash } from 'lucide-react';
 import { Evidence, Case, EvidenceType, User as SystemUser, EvidenceCustody } from '../types';
 
 interface EvidenceViewProps {
@@ -10,6 +10,8 @@ interface EvidenceViewProps {
   onAddEvidence: (evData: any) => void;
   onUpdateEvidence: (evidenceId: number, updates: any) => void;
   currentUser: SystemUser;
+  onDeleteEvidence?: (evidenceId: number) => void;
+  onDataChange?: () => void;
 }
 
 export default function EvidenceView({
@@ -19,7 +21,9 @@ export default function EvidenceView({
   users,
   onAddEvidence,
   onUpdateEvidence,
-  currentUser
+  currentUser,
+  onDeleteEvidence,
+  onDataChange
 }: EvidenceViewProps) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -42,6 +46,12 @@ export default function EvidenceView({
   const [transferRemarks, setTransferRemarks] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
 
+  // Edit evidence states
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDesc, setEditDesc] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+
   const loadCustodyHistory = async (evidenceId: number) => {
     try {
       const res = await fetch(`/api/evidence-custody?evidence_id=${evidenceId}`);
@@ -56,6 +66,10 @@ export default function EvidenceView({
   useEffect(() => {
     if (selectedEvidence) {
       loadCustodyHistory(selectedEvidence.evidence_id);
+      setEditDesc(selectedEvidence.description);
+      setEditLocation(selectedEvidence.storage_location);
+      setEditStatus(selectedEvidence.current_status);
+      setIsEditing(false);
     }
   }, [selectedEvidence, evidence]);
 
@@ -109,6 +123,7 @@ export default function EvidenceView({
         if (updatedItemRes.ok) {
           setSelectedEvidence(await updatedItemRes.json());
         }
+        if (onDataChange) onDataChange();
       }
     } catch (err) {
       console.error(err);
@@ -134,9 +149,38 @@ export default function EvidenceView({
         if (selectedEvidence?.evidence_id === evItem.evidence_id) {
           setSelectedEvidence(up);
         }
+        if (onDataChange) onDataChange();
       }
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEvidence) return;
+
+    try {
+      const response = await fetch(`/api/evidence/${selectedEvidence.evidence_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: editDesc,
+          storage_location: editLocation,
+          current_status: editStatus,
+          operator_id: currentUser.user_id
+        })
+      });
+
+      if (response.ok) {
+        const updated = await response.json();
+        onUpdateEvidence(selectedEvidence.evidence_id, updated);
+        setSelectedEvidence(updated);
+        setIsEditing(false);
+        if (onDataChange) onDataChange();
+      }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -178,7 +222,7 @@ export default function EvidenceView({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search barcodes, descriptions, storage locations..."
-            className="w-full pl-9 pr-4 py-2 bg-slate-55 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-2xl text-slate-800 placeholder-slate-400 text-xs font-semibold focus:outline-none transition-all shadow-inner"
+            className="w-full pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 focus:bg-white focus:border-indigo-500 rounded-2xl text-slate-800 placeholder-slate-400 text-xs font-semibold focus:outline-none transition-all shadow-inner"
           />
         </div>
 
@@ -186,7 +230,7 @@ export default function EvidenceView({
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
-            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-2xl text-slate-700 text-xs bg-slate-55 focus:outline-none focus:bg-white"
+            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-2xl text-slate-700 text-xs bg-slate-100 focus:outline-none focus:bg-white"
           >
             <option value="">All Types</option>
             {evidenceTypes.map(t => (
@@ -199,7 +243,7 @@ export default function EvidenceView({
           <select
             value={caseFilter}
             onChange={(e) => setCaseFilter(e.target.value)}
-            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-2xl text-slate-700 text-xs bg-slate-55 focus:outline-none focus:bg-white"
+            className="w-full pl-3 pr-8 py-2 border border-slate-200 rounded-2xl text-slate-700 text-xs bg-slate-100 focus:outline-none focus:bg-white"
           >
             <option value="">All Cases</option>
             {cases.map(c => (
@@ -214,7 +258,7 @@ export default function EvidenceView({
         
         {/* Left lists */}
         <div className="lg:col-span-2 bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
-          <div className="px-5 py-4 border-b border-slate-100 bg-slate-55/35 flex justify-between items-center text-xs font-bold text-slate-900 uppercase">
+          <div className="px-5 py-4 border-b border-slate-100 bg-slate-100 flex justify-between items-center text-xs font-bold text-slate-900 uppercase">
             <span>Barcode Registry Catalog</span>
             <span className="text-slate-500">{filteredEvidence.length} items logged</span>
           </div>
@@ -239,8 +283,8 @@ export default function EvidenceView({
                   >
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[9px] text-indigo-650 bg-indigo-50 px-2 py-0.5 rounded-lg font-bold tracking-wider">{ev.barcode}</span>
-                        <span className="font-mono text-[9px] text-slate-550 bg-slate-100 px-2 py-0.5 rounded-lg font-bold">{caseNum}</span>
+                        <span className="font-mono text-[9px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-lg font-bold tracking-wider">{ev.barcode}</span>
+                        <span className="font-mono text-[9px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg font-bold">{caseNum}</span>
                       </div>
                       <p className="text-xs font-extrabold text-slate-800">{ev.description}</p>
                     </div>
@@ -251,7 +295,7 @@ export default function EvidenceView({
                       }`}>
                         {ev.is_sealed ? 'SEALED' : 'UNSEALED'}
                       </span>
-                      <span className="text-[10px] font-bold text-slate-450 font-mono uppercase">{ev.current_status}</span>
+                      <span className="text-[10px] font-bold text-slate-400 font-mono uppercase">{ev.current_status}</span>
                     </div>
                   </div>
                 );
@@ -266,36 +310,115 @@ export default function EvidenceView({
             <div className="bg-white border border-slate-200 p-5 rounded-3xl shadow-sm space-y-5">
               
               <div>
-                <h3 className="font-bold text-slate-900 text-sm">Asset Specifications</h3>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-slate-900 text-sm">Asset Specifications</h3>
+                  <button
+                    onClick={() => {
+                      if (isEditing) {
+                        setEditDesc(selectedEvidence.description);
+                        setEditLocation(selectedEvidence.storage_location);
+                        setEditStatus(selectedEvidence.current_status);
+                        setIsEditing(false);
+                      } else {
+                        setIsEditing(true);
+                      }
+                    }}
+                    className="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold uppercase cursor-pointer"
+                  >
+                    {isEditing ? 'Cancel' : 'Edit'}
+                  </button>
+                </div>
                 <p className="text-slate-400 text-[9px] font-medium uppercase mt-0.5">Chain tracking and sealed locker controls</p>
               </div>
 
-              {/* Specifications block */}
-              <div className="space-y-3.5 text-xs">
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-400 font-bold uppercase text-[9px]">Locker Code:</span>
-                  <span className="font-bold text-slate-800">{selectedEvidence.barcode}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-400 font-bold uppercase text-[9px]">Integrity Check:</span>
+              {isEditing ? (
+                <form onSubmit={handleEditSubmit} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Description *</label>
+                    <textarea
+                      required
+                      value={editDesc}
+                      onChange={(e) => setEditDesc(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none"
+                      rows={2}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Storage Location *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editLocation}
+                      onChange={(e) => setEditLocation(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1 ml-1">Current Custody Status</label>
+                    <select
+                      value={editStatus}
+                      onChange={(e) => setEditStatus(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none bg-white font-semibold"
+                    >
+                      <option value="Collected">Collected</option>
+                      <option value="In Transit">In Transit</option>
+                      <option value="Under Analysis">Under Analysis</option>
+                      <option value="In Storage">In Storage</option>
+                      <option value="Presented in Court">Presented in Court</option>
+                      <option value="Returned to Owner">Returned to Owner</option>
+                      <option value="Destroyed">Destroyed</option>
+                    </select>
+                  </div>
                   <button
-                    onClick={() => handleSealToggle(selectedEvidence)}
-                    className={`px-2.5 py-0.5 rounded-lg font-bold text-[9px] cursor-pointer ${
-                      selectedEvidence.is_sealed ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-orange-50 text-orange-700 border border-orange-200'
-                    }`}
+                    type="submit"
+                    className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all cursor-pointer text-center text-xs shadow-md active:scale-[0.98]"
                   >
-                    {selectedEvidence.is_sealed ? 'Toggle Seal (SEALED)' : 'Toggle Seal (UNSEALED)'}
+                    Save Changes
                   </button>
+                </form>
+              ) : (
+                <div className="space-y-3.5 text-xs">
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-400 font-bold uppercase text-[9px]">Locker Code:</span>
+                    <span className="font-bold text-slate-800">{selectedEvidence.barcode}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2 items-center">
+                    <span className="text-slate-400 font-bold uppercase text-[9px]">Integrity Check:</span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleSealToggle(selectedEvidence)}
+                        className={`px-2 py-0.5 rounded-lg font-bold text-[9px] cursor-pointer ${
+                          selectedEvidence.is_sealed ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-orange-50 text-orange-700 border border-orange-200'
+                        }`}
+                      >
+                        {selectedEvidence.is_sealed ? 'Toggle Seal (SEALED)' : 'Toggle Seal (UNSEALED)'}
+                      </button>
+                      {onDeleteEvidence && (
+                        <button
+                          onClick={() => {
+                            if (confirm('Are you sure you want to permanently delete this evidence log?')) {
+                              onDeleteEvidence(selectedEvidence.evidence_id);
+                              setSelectedEvidence(null);
+                            }
+                          }}
+                          className="p-1 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded transition-all cursor-pointer"
+                          title="Delete Evidence log"
+                        >
+                          <Trash className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-400 font-bold uppercase text-[9px]">Status:</span>
+                    <span className="font-bold text-slate-700 uppercase">{selectedEvidence.current_status}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-400 font-bold uppercase text-[9px]">Storage Location:</span>
+                    <span className="font-bold text-slate-700">{selectedEvidence.storage_location}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-400 font-bold uppercase text-[9px]">Status:</span>
-                  <span className="font-bold text-slate-700 uppercase">{selectedEvidence.current_status}</span>
-                </div>
-                <div className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-400 font-bold uppercase text-[9px]">Storage Location:</span>
-                  <span className="font-bold text-slate-700">{selectedEvidence.storage_location}</span>
-                </div>
-              </div>
+              )}
 
               {/* Transfer Form */}
               <form onSubmit={handleTransferSubmit} className="pt-4 border-t border-slate-100 space-y-3">
@@ -354,12 +477,12 @@ export default function EvidenceView({
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
-            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-55/30">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-100">
               <div>
                 <h3 className="text-sm font-black text-slate-900">Record Collected Evidence</h3>
                 <p className="text-[10px] text-slate-500 font-medium uppercase mt-0.5">Log collected asset parameters into database</p>
               </div>
-              <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-650 cursor-pointer">
+              <button onClick={() => setShowAddModal(false)} className="p-1.5 hover:bg-slate-100 rounded-xl transition-all text-slate-400 hover:text-slate-700 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -431,13 +554,13 @@ export default function EvidenceView({
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold cursor-pointer hover:bg-slate-55"
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-slate-500 text-xs font-bold cursor-pointer hover:bg-slate-100"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-650 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-[0.98] cursor-pointer"
                 >
                   Confirm Entry
                 </button>
