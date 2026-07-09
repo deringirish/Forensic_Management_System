@@ -27,3 +27,6 @@ backend/.env
 # Shared Uploads
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Build caches
+tsconfig.tsbuildinfo
