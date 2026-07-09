@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Federal Forensic Case Management System (FMS)
 
 A secure, modern, full-stack Laboratory Operations and Custody Management system built with React, Node.js (Express), and MySQL.
@@ -85,3 +86,6 @@ The database connection is lazily-initialized. On the first connection, the syst
 - **Administrator**: `admin@forensics.gov` / `admin123`
 - **Lead Investigator**: `investigator@forensics.gov` / `investigator123`
 - **Forensic Analyst**: `analyst@forensics.gov` / `analyst123`
+=======
+# Forensic Management System
+>>>>>>> d034be192cfe590300a22b5b1c2c2112e65d719c
