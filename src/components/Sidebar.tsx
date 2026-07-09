@@ -1,6 +1,6 @@
-import { Shield, LayoutDashboard, Briefcase, FileSearch, LogOut } from 'lucide-react';
+import { Shield, LayoutDashboard, Briefcase, FileSearch, LogOut, Users } from 'lucide-react';
 
-export type ActiveTab = 'dashboard' | 'cases' | 'evidence';
+export type ActiveTab = 'dashboard' | 'cases' | 'evidence' | 'users';
 
 interface SidebarProps {
   activeTab: ActiveTab;
@@ -81,6 +81,7 @@ export default function Sidebar({
         {renderNavButton('dashboard', 'Dashboard Hub', LayoutDashboard)}
         {renderNavButton('cases', 'Dossiers & Cases', Briefcase)}
         {renderNavButton('evidence', 'Evidence Locker', FileSearch)}
+        {renderNavButton('users', 'User Accounts', Users)}
       </nav>
 
       {/* Footer / Sign out */}

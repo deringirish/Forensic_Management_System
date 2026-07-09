@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others \"next dev\" \"cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000\"",
+    "dev": "concurrently --kill-others \"next dev\" \"cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload\"",
     "dev:frontend": "next dev",
-    "dev:backend": "cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000",
+    "dev:backend": "cd backend && venv\\Scripts\\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

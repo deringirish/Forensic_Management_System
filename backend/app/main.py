@@ -713,6 +713,15 @@ def delete_evidence(evidence_id: int, operator_id: int = 1):
     log_action(operator_id, "DELETE_EVIDENCE", "evidence", evidence_id)
     return {"success": True}
 
+@app.delete("/api/users/{user_id}")
+def delete_user_endpoint(user_id: int, operator_id: int = 1):
+    existing = get("SELECT * FROM users WHERE user_id = %s", [user_id])
+    if not existing:
+        raise HTTPException(status_code=404, detail="User account not found")
+    run_db("DELETE FROM users WHERE user_id = %s", [user_id])
+    log_action(operator_id, "DELETE_USER", "users", user_id)
+    return {"success": True}
+
 @app.delete("/api/documents/{document_id}")
 def delete_document(document_id: int, operator_id: int = 1):
     existing = get("SELECT * FROM documents WHERE document_id = %s", [document_id])

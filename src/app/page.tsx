@@ -8,6 +8,7 @@ import DashboardView from '../components/DashboardView';
 import CasesView from '../components/CasesView';
 import CaseDetailsView from '../components/CaseDetailsView';
 import EvidenceView from '../components/EvidenceView';
+import UsersView from '../components/UsersView';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -22,7 +23,7 @@ export default function App() {
       const tab = params.get('tab') as ActiveTab;
       const caseId = params.get('caseId');
       
-      if (tab && ['dashboard', 'cases', 'evidence'].includes(tab)) {
+      if (tab && ['dashboard', 'cases', 'evidence', 'users'].includes(tab)) {
         setActiveTab(tab);
       }
       if (caseId) {
@@ -306,6 +307,15 @@ export default function App() {
               currentUser={currentUser}
               onDeleteEvidence={handleDeleteEvidence}
               onDataChange={fetchAllData}
+            />
+          )}
+
+          {/* User Accounts View */}
+          {activeTab === 'users' && (
+            <UsersView
+              currentUser={currentUser}
+              roles={roles}
+              departments={departments}
             />
           )}
 
