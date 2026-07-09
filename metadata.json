@@ -1,0 +1,6 @@
+{
+  "name": "Forensic Management System",
+  "description": "A comprehensive, high-fidelity platform for managing forensic cases, crime scenes, evidence collection, chain of custody logs, documents, and system audit logs.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
