@@ -125,11 +125,134 @@ def init_database():
             '$2b$10$f5uxP57rSjt46GZJteQFRel3QPs40APJmDmXAY3QfufOG51UKSlx.', old_analyst_hash
         ])
 
+        init_advanced_db_features()
+
         is_initialized = True
         print("Database schema bootstrapped and checked successfully.")
     except Exception as err:
         print(f"Error during MySQL verification/seeding: {err}")
         raise err
+
+def init_advanced_db_features():
+    if is_standby_mode:
+        return
+        
+    # 1. Create View
+    try:
+        run_raw("""
+            CREATE OR REPLACE VIEW v_case_summaries AS
+            SELECT 
+                c.case_id,
+                c.case_number,
+                c.title,
+                c.description,
+                c.crime_type,
+                c.priority,
+                c.status,
+                c.opened_date,
+                c.closed_date,
+                c.lead_investigator as investigator_id,
+                CONCAT(u.first_name, ' ', u.last_name) AS lead_investigator_name,
+                c.crime_scene_id,
+                cs.address AS scene_address,
+                cs.city AS scene_city,
+                (SELECT COUNT(*) FROM evidence e WHERE e.case_id = c.case_id) AS evidence_count,
+                (SELECT COUNT(*) FROM suspects s WHERE s.case_id = c.case_id) AS suspect_count,
+                (SELECT COUNT(*) FROM victims v WHERE v.case_id = c.case_id) AS victim_count,
+                (SELECT COUNT(*) FROM witnesses w WHERE w.case_id = c.case_id) AS witness_count
+            FROM cases c
+            LEFT JOIN users u ON c.lead_investigator = u.user_id
+            LEFT JOIN crime_scenes cs ON c.crime_scene_id = cs.scene_id
+        """)
+        print("MySQL View v_case_summaries created successfully.")
+    except Exception as err:
+        print(f"Failed to create MySQL View: {err}")
+
+    # 2. Create Stored Procedure
+    try:
+        try:
+            run_raw("DROP PROCEDURE IF EXISTS sp_transfer_custody")
+        except:
+            pass
+            
+        run_raw("""
+            CREATE PROCEDURE sp_transfer_custody(
+                IN p_evidence_id INT,
+                IN p_from_user INT,
+                IN p_to_user INT,
+                IN p_purpose VARCHAR(255),
+                IN p_location VARCHAR(255),
+                IN p_remarks TEXT,
+                IN p_status VARCHAR(50),
+                OUT p_success BOOLEAN
+            )
+            BEGIN
+                DECLARE EXIT HANDLER FOR SQLEXCEPTION
+                BEGIN
+                    ROLLBACK;
+                    SET p_success = FALSE;
+                END;
+
+                START TRANSACTION;
+
+                -- 1. Insert custody log
+                INSERT INTO evidence_custody (evidence_id, from_user, to_user, transfer_date, purpose, location, remarks)
+                VALUES (p_evidence_id, p_from_user, p_to_user, NOW(), p_purpose, p_location, p_remarks);
+
+                -- 2. Update current status in evidence table
+                UPDATE evidence
+                SET current_status = p_status,
+                    storage_location = p_location
+                WHERE evidence_id = p_evidence_id;
+
+                COMMIT;
+                SET p_success = TRUE;
+            END
+        """)
+        print("MySQL Stored Procedure sp_transfer_custody created successfully.")
+    except Exception as err:
+        print(f"Failed to create MySQL Stored Procedure: {err}")
+
+    # 3. Create Triggers
+    try:
+        try:
+            run_raw("DROP TRIGGER IF EXISTS trg_case_update")
+        except:
+            pass
+        run_raw("""
+            CREATE TRIGGER trg_case_update
+            AFTER UPDATE ON cases
+            FOR EACH ROW
+            BEGIN
+                IF OLD.status <> NEW.status OR OLD.priority <> NEW.priority OR OLD.lead_investigator <> NEW.lead_investigator THEN
+                    INSERT INTO audit_logs (user_id, action, table_name, record_id, timestamp, ip_address)
+                    VALUES (NEW.lead_investigator, CONCAT('CASE_STATE_CHANGE: status=', NEW.status, ', priority=', NEW.priority), 'cases', NEW.case_id, NOW(), '127.0.0.1');
+                END IF;
+            END
+        """)
+        print("MySQL Trigger trg_case_update created successfully.")
+    except Exception as err:
+        print(f"Failed to create MySQL Trigger trg_case_update: {err}")
+
+    try:
+        try:
+            run_raw("DROP TRIGGER IF EXISTS trg_evidence_update")
+        except:
+            pass
+        run_raw("""
+            CREATE TRIGGER trg_evidence_update
+            AFTER UPDATE ON evidence
+            FOR EACH ROW
+            BEGIN
+                IF OLD.current_status <> NEW.current_status OR OLD.storage_location <> NEW.storage_location OR OLD.is_sealed <> NEW.is_sealed THEN
+                    INSERT INTO audit_logs (user_id, action, table_name, record_id, timestamp, ip_address)
+                    VALUES (COALESCE(NEW.collected_by, 1), CONCAT('EVIDENCE_UPDATE: status=', NEW.current_status, ', location=', NEW.storage_location, ', sealed=', NEW.is_sealed), 'evidence', NEW.evidence_id, NOW(), '127.0.0.1');
+                END IF;
+            END
+        """)
+        print("MySQL Trigger trg_evidence_update created successfully.")
+    except Exception as err:
+        print(f"Failed to create MySQL Trigger trg_evidence_update: {err}")
 
 def parse_sql(sql):
     sql = re.sub(r'/\*[\s\S]*?\*/', '', sql)

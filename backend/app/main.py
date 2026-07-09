@@ -276,7 +276,7 @@ def update_user(user_id: int, body: UserUpdate):
 # 5. GET /api/cases & POST /api/cases
 @app.get("/api/cases")
 def get_cases():
-    return query("SELECT * FROM cases ORDER BY case_id DESC")
+    return query("SELECT * FROM v_case_summaries ORDER BY case_id DESC")
 
 @app.post("/api/cases", status_code=201)
 def create_case(body: CaseCreate):
@@ -478,14 +478,17 @@ def transfer_evidence_custody(body: EvidenceCustodyCreate):
     transfer_date = datetime.datetime.now(datetime.timezone.utc).isoformat()
     op_id = body.from_user or 1
     
-    result = run_db(
-        """INSERT INTO evidence_custody (evidence_id, from_user, to_user, transfer_date, purpose, location, remarks)
-           VALUES (%s, %s, %s, %s, %s, %s, %s)""",
-        [body.evidence_id, op_id, body.to_user, transfer_date, body.purpose, body.location, body.remarks]
-    )
-    run_db("UPDATE evidence SET storage_location = %s, current_status = 'Transferred' WHERE evidence_id = %s", [body.location, body.evidence_id])
-    custody = get("SELECT * FROM evidence_custody WHERE custody_id = %s", [result["lastID"]])
-    log_action(op_id, "TRANSFER_EVIDENCE", "evidence_custody", result["lastID"])
+    # Call MySQL Stored Procedure using transaction parameters
+    run_db("CALL sp_transfer_custody(%s, %s, %s, %s, %s, %s, %s, @success)", [
+        body.evidence_id, op_id, body.to_user, body.purpose or "Custody Transfer", body.location, body.remarks or "", "Transferred"
+    ])
+    
+    # Fetch the newly created custody record from database View/Table
+    custody = get("SELECT * FROM evidence_custody WHERE evidence_id = %s ORDER BY custody_id DESC LIMIT 1", [body.evidence_id])
+    if not custody:
+        raise HTTPException(status_code=500, detail="Custody transfer transaction failed.")
+        
+    log_action(op_id, "TRANSFER_EVIDENCE", "evidence_custody", custody["custody_id"])
     log_timeline(item["case_id"], op_id, "Custody Transferred", f"Evidence {item['barcode']} handed over to User ID {body.to_user}. Location: {body.location}")
     return custody
 
