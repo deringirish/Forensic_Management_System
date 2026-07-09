@@ -420,6 +420,48 @@ export default function EvidenceView({
                 </div>
               )}
 
+              {/* Chain of Custody History List */}
+              <div className="pt-4 border-t border-slate-100 space-y-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                  Chain of Custody History ({custodyHistory.length})
+                </span>
+                {custodyHistory.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 italic">No custody transfer history recorded.</p>
+                ) : (
+                  <div className="relative pl-4 border-l-2 border-indigo-100 space-y-4 pt-1 max-h-48 overflow-y-auto">
+                    {custodyHistory.map((history) => {
+                      const fromUserObj = users.find(u => u.user_id === history.from_user);
+                      const toUserObj = users.find(u => u.user_id === history.to_user);
+                      const fromName = fromUserObj ? `${fromUserObj.first_name} ${fromUserObj.last_name}` : 'Officer';
+                      const toName = toUserObj ? `${toUserObj.first_name} ${toUserObj.last_name}` : 'Officer';
+                      
+                      return (
+                        <div key={history.custody_id} className="relative text-[11px] space-y-0.5">
+                          {/* Timeline dot */}
+                          <div className="absolute -left-[21px] top-1.5 w-2 h-2 rounded-full bg-indigo-500 border border-white" />
+                          <div className="font-bold text-slate-800">
+                            Handoff to {toName}
+                          </div>
+                          <div className="text-slate-400 text-[9px] font-medium uppercase">
+                            By {fromName} • {new Date(history.transfer_date).toLocaleDateString()}
+                          </div>
+                          {history.purpose && (
+                            <p className="text-slate-600 mt-1 bg-slate-50 p-2 rounded-xl border border-slate-100 italic">
+                              "{history.purpose}" {history.remarks ? `— ${history.remarks}` : ''}
+                            </p>
+                          )}
+                          {history.location && (
+                            <div className="text-[9px] text-slate-450 font-bold uppercase mt-1">
+                              LOCATION: <span className="text-slate-700">{history.location}</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Transfer Form */}
               <form onSubmit={handleTransferSubmit} className="pt-4 border-t border-slate-100 space-y-3">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Transfer Custody Handover</span>
